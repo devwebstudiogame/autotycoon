@@ -14,8 +14,8 @@ const firebaseConfig = {
 
 // 2. CONFIGURATION EMAILJS
 const EMAILJS_TEMPLATE_ID = "template_3i7lovf"; 
-const EMAILJS_SERVICE_ID = "TON_SERVICE_ID";   // ⚠️ Ton Service ID EmailJS
-const EMAILJS_PUBLIC_KEY = "TA_PUBLIC_KEY";     // ⚠️ Ta Public Key EmailJS
+const EMAILJS_SERVICE_ID = "TON_SERVICE_ID";   // ⚠️ Remplace par ton Service ID EmailJS
+const EMAILJS_PUBLIC_KEY = "TA_PUBLIC_KEY";     // ⚠️ Remplace par ta Public Key EmailJS
 
 // Initialisations
 const app = initializeApp(firebaseConfig);
@@ -31,7 +31,7 @@ document.getElementById('btn-register').addEventListener('click', registerUser);
 document.getElementById('btn-logout').addEventListener('click', logoutUser);
 
 /**
- * Inscription d'un nouveau joueur (CORRIGÉE)
+ * Inscription d'un nouveau joueur
  */
 function registerUser() {
     const email = document.getElementById('auth-email').value;
@@ -50,22 +50,29 @@ function registerUser() {
         .then(async (userCredential) => {
             currentUser = userCredential.user;
             
-            // CORRECTION BUG 1 : Initialiser le joueur ET générer directement le premier marché
+            // Forcer l'initialisation des fonctions globales pour le premier jour
             if (typeof initPlayer === "function") initPlayer(); 
-            if (typeof refreshMarket === "function") refreshMarket(); // Génère les voitures J1 !
+            if (typeof refreshMarket === "function") refreshMarket(); 
 
-            // CORRECTION BUG 2 : On utilise 'await' pour s'assurer que le mail part ET que la BDD enregistre avant le reload
+            // Attente des envois asynchrones (Email + Sauvegarde initiale avec argent de départ)
             try {
                 errorEl.innerText = "Envoi du mail de bienvenue...";
                 await sendWelcomeEmail(email);
+            } catch(e) {
+                console.warn("EmailJS bloqué ou mal configuré, création du compte maintenue.", e);
+            }
 
-                errorEl.innerText = "Génération du premier stock...";
+            try {
+                errorEl.innerText = "Génération du capital de départ (20 000 €)...";
                 await saveDataToFirebase();
-                
                 errorEl.innerText = "Démarrage !";
-                location.reload(); // Maintenant on peut recharger sans coupure !
+                
+                // Petit délai de confort avant de recharger pour laisser Firestore respirer
+                setTimeout(() => {
+                    location.reload();
+                }, 1000);
             } catch (err) {
-                console.error("Erreur durant la phase de création : ", err);
+                console.error("Erreur d'écriture BDD : ", err);
                 location.reload();
             }
         })
@@ -102,31 +109,27 @@ function logoutUser() {
 }
 
 /**
- * Envoi du mail de bienvenue (EmailJS - Converti en Promise pour l'asynchrone)
+ * Envoi du mail via EmailJS
  */
 function sendWelcomeEmail(userEmail) {
     const templateParams = {
         user_email: userEmail,
         reply_to: "no-reply@garagetycoon.com"
     };
-
-    // On retourne la promesse pour que le script attende la fin de l'envoi
     return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
 }
 
-// --- LOGIQUE DE SAUVEGARDE FIRESTORE ---
-
 /**
- * Pousse les données locales vers le cloud Firebase
+ * Pousse les données globales vers Cloud Firestore
  */
 window.saveDataToFirebase = async function() {
     if (!currentUser) return;
     
     try {
         await setDoc(doc(db, "players", currentUser.uid), {
-            gameState: gameState,
-            player: player,
-            marketVehicles: marketVehicles,
+            gameState: window.gameState,
+            player: window.player,
+            marketVehicles: window.marketVehicles,
             lastSave: new Date()
         });
         console.log("Sauvegarde cloud synchronisée !");
@@ -136,7 +139,7 @@ window.saveDataToFirebase = async function() {
 }
 
 /**
- * Observeur en temps réel de l'état de connexion du joueur
+ * Observeur d'état de connexion
  */
 onAuthStateChanged(auth, async (user) => {
     const authScreen = document.getElementById('auth-screen');
@@ -148,7 +151,7 @@ onAuthStateChanged(auth, async (user) => {
         gameWrapper.classList.remove('hidden'); 
         document.getElementById('user-display-email').innerText = user.email;
 
-        // Récupération de la sauvegarde depuis Firestore
+        // Récupération de la sauvegarde
         const docRef = doc(db, "players", user.uid);
         const docSnap = await getDoc(docRef);
 
@@ -158,9 +161,14 @@ onAuthStateChanged(auth, async (user) => {
             window.player = data.player;
             window.marketVehicles = data.marketVehicles;
             console.log("Sauvegarde restaurée depuis Firebase Cloud !");
+        } else {
+            // Sécurité si un compte existe dans Auth mais n'a pas de document Firestore
+            if (typeof initPlayer === "function") initPlayer(); 
+            if (typeof refreshMarket === "function") refreshMarket();
+            await saveDataToFirebase();
         }
         
-        if(typeof updateGlobalUI === "function") updateGlobalUI();
+        if(typeof window.updateGlobalUI === "function") window.updateGlobalUI();
 
     } else {
         currentUser = null;
