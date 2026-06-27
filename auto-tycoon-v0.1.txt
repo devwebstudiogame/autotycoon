@@ -1,0 +1,9 @@
+auto-tycoon-v0.1/
+├── index.html          # La structure HTML globale de l'application
+├── css/
+│   └── style.css       # Le design complet, les animations, le layout
+└── js/
+    ├── main.js         # Le cœur du jeu (initialisation, boucle de temps)
+    ├── data.js         # Ta base de données (modèles de voitures, motos, camions)
+    ├── player.js       # L'état du joueur (argent, inventaire, réputation)
+    └── market.js       # La logique de génération du marché de l'occasion

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Garage Tycoon - Online</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+</head>
+<body>
+
+    <div id="auth-screen" class="modal">
+        <div class="modal-content" style="width: 450px;">
+            <h2 id="auth-title">🛸 CONNEXION AU GARAGE</h2>
+            <p class="modal-desc">Rejoignez votre empire automobile en ligne.</p>
+            
+            <div class="menu-actions" style="gap: 10px; text-align: left;">
+                <label style="color: var(--text-muted); font-size: 0.9rem;">Adresse E-mail</label>
+                <input type="email" id="auth-email" placeholder="chef@garage.com" style="padding: 12px; background: var(--bg-main); border: 1px solid #334155; color: white; border-radius: 6px; font-family: inherit;">
+                
+                <label style="color: var(--text-muted); font-size: 0.9rem;">Mot de passe</label>
+                <input type="password" id="auth-password" placeholder="••••••••" style="padding: 12px; background: var(--bg-main); border: 1px solid #334155; color: white; border-radius: 6px; font-family: inherit;">
+                
+                <button id="btn-login" class="btn-buy" style="margin-top: 15px;">Se connecter</button>
+                <button id="btn-register" class="btn-sell">Créer un compte</button>
+            </div>
+            <p id="auth-error" style="color: var(--danger); font-size: 0.9rem; margin-top: 15px; font-weight: bold;"></p>
+        </div>
+    </div>
+
+    <div id="game-container-wrapper" class="hidden">
+        <header class="game-header">
+            <div class="brand">
+                <h1>Garage Tycoon <span class="version">v0.2</span></h1>
+            </div>
+            <div class="stats-bar">
+                <div class="stat-item">📅 <span id="calendar">Jour 1</span></div>
+                <div class="stat-item">💰 <span id="player-cash">0 €</span></div>
+                <div class="stat-item">⭐ Niv. <span id="player-level">1</span> (<span id="player-xp">0</span> XP)</div>
+                <div class="stat-item">🚗 Garage : <span id="garage-slots">0 / 0</span></div>
+            </div>
+            <div class="time-controls" style="display: flex; gap: 10px;">
+                <button id="btn-menu-open" class="btn-upgrade" style="width: auto; padding: 10px 20px;">⚙️ Menu Cloud</button>
+                <button id="btn-next-day" class="btn-action">Fin de journée ➔</button>
+            </div>
+        </header>
+
+        <main class="game-layout">
+            <section class="game-panel" id="panel-market">
+                <div class="panel-header">
+                    <h2>Marché de l'Occasion</h2>
+                    <span class="panel-subtitle">Trouvez la perle rare</span>
+                </div>
+                <div id="market-container" class="cards-list"></div>
+            </section>
+
+            <section class="game-panel" id="panel-garage">
+                <div class="panel-header">
+                    <h2>Mon Garage</h2>
+                    <span class="panel-subtitle">Gérez et réparez vos véhicules</span>
+                </div>
+                <div id="garage-container" class="cards-list"></div>
+            </section>
+
+            <section class="game-panel" id="panel-office">
+                <div class="panel-header">
+                    <h2>Le Bureau Cloud</h2>
+                    <span class="panel-subtitle">Sauvegardes en ligne</span>
+                </div>
+                <div class="panel-content">
+                    <div class="upgrade-box">
+                        <h3>Agrandir le garage</h3>
+                        <p>Ajoute 2 emplacements supplémentaires.</p>
+                        <button id="btn-upgrade-garage" class="btn-upgrade">Agrandir (5 000 €)</button>
+                    </div>
+                    <div class="stats-box">
+                        <p>Joueur connecté : <strong id="user-display-email" style="color:var(--secondary)">-</strong></p>
+                        <p>Véhicules vendus : <span id="stat-total-sold">0</span></p>
+                        <p>Bénéfices totaux : <span id="stat-total-profit">0 €</span></p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div id="game-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>⚙️ EMPREINTE CLOUD</h2>
+            <p class="modal-desc">Vos données sont synchronisées sur le serveur.</p>
+            <div class="menu-actions">
+                <button class="btn-buy" onclick="saveDataToFirebase()">☁ Sauvegarder sur Firebase</button>
+                <button class="btn-action" id="btn-logout" style="background: var(--danger);">🚪 Déconnexion</button>
+            </div>
+            <button id="btn-menu-close" class="btn-repair" style="width: 100%; margin-top: 20px;">✖ Retour au Garage</button>
+        </div>
+    </div>
+
+    <script src="js/data.js"></script>
+    <script src="js/player.js"></script>
+    <script src="js/market.js"></script>
+    <script type="module" src="js/firebase-auth.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
