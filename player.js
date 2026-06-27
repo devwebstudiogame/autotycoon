@@ -1,39 +1,32 @@
 /* ==========================================================================
-   MODULE : PLAYER & GARAGE LOGIC
+   MODULE : PLAYER & GARAGE LOGIC (CLOUD COMPATIBLE)
    ========================================================================== */
 
-// Déclaration de l'objet joueur
-let player = {
-    cash: 0,
-    level: 1,
-    xp: 0,
-    garageSlots: 0,
-    garage: [] // Contient les véhicules achetés
-};
-
 /**
- * Initialise les données du joueur à partir du fichier équilibrage (data.js)
+ * Initialise les données du joueur sur l'objet global window
  */
 function initPlayer() {
-    player.cash = GAME_BALANCING.startingCash;
-    player.garageSlots = GAME_BALANCING.baseGarageSlots;
-    player.level = 1;
-    player.xp = 0;
-    player.garage = [];
+    window.player = {
+        cash: GAME_BALANCING.startingCash,
+        level: 1,
+        xp: 0,
+        garageSlots: GAME_BALANCING.baseGarageSlots,
+        garage: []
+    };
+    console.log("Capital initialisé : " + window.player.cash + " €");
 }
 
 /**
  * Ajoute de l'expérience au joueur et gère le passage de niveau
  */
 function addXp(amount) {
-    player.xp += amount;
+    window.player.xp += amount;
     
-    // Vérification du passage de niveau (basé sur les paliers de data.js)
-    let currentThreshold = GAME_BALANCING.xpThresholds[player.level - 1];
+    let currentThreshold = GAME_BALANCING.xpThresholds[window.player.level - 1];
     
-    if (player.xp >= currentThreshold) {
-        player.level++;
-        alert(`🎉 Félicitations ! Vous passez Niveau ${player.level} ! De nouveaux véhicules sont disponibles sur le marché.`);
+    if (window.player.xp >= currentThreshold) {
+        window.player.level++;
+        alert(`🎉 Félicitations ! Vous passez Niveau ${window.player.level} ! De nouveaux véhicules sont disponibles sur le marché.`);
     }
 }
 
@@ -43,12 +36,12 @@ function addXp(amount) {
 function upgradeGarageSpace() {
     const cost = GAME_BALANCING.upgradeSlotsCost;
     
-    if (player.cash >= cost) {
-        player.cash -= cost;
-        player.garageSlots += GAME_BALANCING.upgradeSlotsAmount;
+    if (window.player.cash >= cost) {
+        window.player.cash -= cost;
+        window.player.garageSlots += GAME_BALANCING.upgradeSlotsAmount;
         
-        // Notification et mise à jour de l'écran
-        if (typeof updateGlobalUI === "function") updateGlobalUI();
+        if (typeof window.saveDataToFirebase === "function") window.saveDataToFirebase();
+        if (typeof window.updateGlobalUI === "function") window.updateGlobalUI();
     } else {
         alert("Fonds insuffisants pour agrandir le garage !");
     }
@@ -58,21 +51,19 @@ function upgradeGarageSpace() {
  * Répare un véhicule du garage à 100% et ajoute le coût au prix d'achat
  */
 function repairVehicleInGarage(vehicleId) {
-    const vehicle = player.garage.find(v => v.id === vehicleId);
+    const vehicle = window.player.garage.find(v => v.id === vehicleId);
     if (!vehicle || vehicle.condition >= 100) return;
 
     const missingCondition = 100 - vehicle.condition;
     const cost = missingCondition * GAME_BALANCING.repairCostPerPercent;
 
-    if (player.cash >= cost) {
-        player.cash -= cost;
-        
-        // AJOUT : Le coût de la réparation s'ajoute au prix d'achat initial (coût de revient)
+    if (window.player.cash >= cost) {
+        window.player.cash -= cost;
         vehicle.purchasePrice += cost;
+        vehicle.condition = 100;
         
-        vehicle.condition = 100; // Remis à neuf !
-        
-        if (typeof updateGlobalUI === "function") updateGlobalUI();
+        if (typeof window.saveDataToFirebase === "function") window.saveDataToFirebase();
+        if (typeof window.updateGlobalUI === "function") window.updateGlobalUI();
     } else {
         alert("Vous n'avez pas assez d'argent pour payer les réparations !");
     }
@@ -82,32 +73,23 @@ function repairVehicleInGarage(vehicleId) {
  * Vend un véhicule présent dans le garage
  */
 function sellVehicleFromGarage(vehicleId) {
-    const index = player.garage.findIndex(v => v.id === vehicleId);
+    const index = window.player.garage.findIndex(v => v.id === vehicleId);
     if (index === -1) return;
     
-    const vehicle = player.garage[index];
-
-    // Calcul du prix de vente final basé sur l'état actuel
+    const vehicle = window.player.garage[index];
     const finalPrice = Math.floor(vehicle.estimatedValue * (vehicle.condition / 100));
-    
-    // Le profit prend maintenant en compte le prix d'achat + les réparations (grâce à la modification ci-dessus)
     const profit = finalPrice - vehicle.purchasePrice;
 
-    // Mise à jour du portefeuille du joueur
-    player.cash += finalPrice;
+    window.player.cash += finalPrice;
     
-    // Mise à jour des statistiques globales du Bureau (main.js)
-    gameState.stats.totalSold++;
-    gameState.stats.totalProfit += profit;
+    window.gameState.stats.totalSold++;
+    window.gameState.stats.totalProfit += profit;
 
-    // Octroi de l'XP
     addXp(vehicle.xpReward);
+    window.player.garage.splice(index, 1);
 
-    // Retrait du véhicule du garage
-    player.garage.splice(index, 1);
-
-    // Rafraîchissement de l'affichage
-    if (typeof updateGlobalUI === "function") updateGlobalUI();
+    if (typeof window.saveDataToFirebase === "function") window.saveDataToFirebase();
+    if (typeof window.updateGlobalUI === "function") window.updateGlobalUI();
 }
 
 /* ==========================================================================
@@ -115,37 +97,36 @@ function sellVehicleFromGarage(vehicleId) {
    ========================================================================== */
 
 function updatePlayerUI() {
-    // Éléments du Header
-    document.getElementById('player-cash').innerText = `${player.cash.toLocaleString()} €`;
-    document.getElementById('player-level').innerText = player.level;
-    document.getElementById('player-xp').innerText = player.xp;
-    document.getElementById('garage-slots').innerText = `${player.garage.length} / ${player.garageSlots}`;
+    if (!window.player) return;
 
-    // Bouton de mise à niveau du Bureau
+    document.getElementById('player-cash').innerText = `${window.player.cash.toLocaleString()} €`;
+    document.getElementById('player-level').innerText = window.player.level;
+    document.getElementById('player-xp').innerText = window.player.xp;
+    document.getElementById('garage-slots').innerText = `${window.player.garage.length} / ${window.player.garageSlots}`;
+
     const btnUpgrade = document.getElementById('btn-upgrade-garage');
     if (btnUpgrade) {
         btnUpgrade.innerText = `Agrandir (+${GAME_BALANCING.upgradeSlotsAmount} places) - ${GAME_BALANCING.upgradeSlotsCost.toLocaleString()} €`;
-        btnUpgrade.disabled = (player.cash < GAME_BALANCING.upgradeSlotsCost);
+        btnUpgrade.disabled = (window.player.cash < GAME_BALANCING.upgradeSlotsCost);
     }
 }
 
 function updateGarageUI() {
     const container = document.getElementById('garage-container');
-    if (!container) return;
+    if (!container || !window.player) return;
 
     container.innerHTML = '';
 
-    if (player.garage.length === 0) {
+    if (window.player.garage.length === 0) {
         container.innerHTML = '<div class="empty-message">Votre garage est vide. Achetez un véhicule au marché.</div>';
         return;
     }
 
-    player.garage.forEach(vehicle => {
+    window.player.garage.forEach(vehicle => {
         const missingCondition = 100 - vehicle.condition;
         const repairCost = missingCondition * GAME_BALANCING.repairCostPerPercent;
         const currentResaleValue = Math.floor(vehicle.estimatedValue * (vehicle.condition / 100));
 
-        // Création de la carte HTML
         const card = document.createElement('div');
         card.className = 'vehicle-card';
         card.innerHTML = `
@@ -168,3 +149,8 @@ function updateGarageUI() {
         container.appendChild(card);
     });
 }
+
+// Globalisation des fonctions de rendu
+window.initPlayer = initPlayer;
+window.updatePlayerUI = updatePlayerUI;
+window.updateGarageUI = updateGarageUI;
