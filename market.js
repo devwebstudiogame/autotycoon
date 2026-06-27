@@ -1,35 +1,26 @@
 /* ==========================================================================
-   MODULE : MARKET LOGIC & NEGOTIATION
+   MODULE : MARKET LOGIC & NEGOTIATION (CLOUD COMPATIBLE)
    ========================================================================== */
 
-let marketVehicles = [];
-
 /**
- * Génère un nouvel arrivage de véhicules sur le marché
+ * Génère un nouvel arrivage de véhicules sur le marché global window
  */
 function refreshMarket() {
-    marketVehicles = [];
+    window.marketVehicles = [];
     
-    // Filtrer le catalogue global (data.js) pour ne garder que les véhicules accessibles au niveau du joueur
-    const availableModels = VEHICLE_CATALOG.filter(v => v.minLevel <= player.level);
+    if (!window.player) return;
+    const availableModels = VEHICLE_CATALOG.filter(v => v.minLevel <= window.player.level);
     
     if (availableModels.length === 0) return;
 
-    // Générer le nombre de véhicules défini dans GAME_BALANCING
     for (let i = 0; i < GAME_BALANCING.marketSize; i++) {
         const randomModel = availableModels[Math.floor(Math.random() * availableModels.length)];
-        
-        // Génération d'un état aléatoire (entre 35% et 90%)
         const condition = Math.floor(Math.random() * 55) + 35;
-        
-        // Calcul du prix initial basé sur l'état (décote proportionnelle à l'usure)
-        const conditionDiscount = (100 - condition) * 0.006; // Moins l'état est bon, moins c'est cher
+        const conditionDiscount = (100 - condition) * 0.006;
         const baseProposedPrice = Math.floor(randomModel.basePrice * (1 - conditionDiscount));
-        
-        // Valeur de revente maximale théorique si remis à 100% d'état (+15% de marge brute)
         const estimatedValue = Math.floor(randomModel.basePrice * 1.15);
 
-        marketVehicles.push({
+        window.marketVehicles.push({
             id: Date.now() + i + Math.floor(Math.random() * 1000),
             type: randomModel.type,
             brand: randomModel.brand,
@@ -38,65 +29,60 @@ function refreshMarket() {
             purchasePrice: baseProposedPrice,
             estimatedValue: estimatedValue,
             xpReward: randomModel.xpReward,
-            hasNegotiated: false // Empêche de négocier plusieurs fois le même véhicule
+            hasNegotiated: false
         });
     }
 }
 
 /**
- * Tente de négocier le prix d'achat d'un véhicule (Mécanique Gameplay V0.1)
+ * Tente de négocier le prix d'achat d'un véhicule
  */
 function negotiateVehiclePrice(vehicleId) {
-    const vehicle = marketVehicles.find(v => v.id === vehicleId);
+    const vehicle = window.marketVehicles.find(v => v.id === vehicleId);
     if (!vehicle || vehicle.hasNegotiated) return;
 
-    vehicle.hasNegotiated = true; // Verrouille la négociation pour ce véhicule
-
-    // 60% de chances de réussite, 40% de chances d'échec
+    vehicle.hasNegotiated = true;
     const isSuccess = Math.random() < 0.60;
 
     if (isSuccess) {
-        // Baisse le prix aléatoirement entre 7% et 18%
         const priceDropPercent = Math.floor(Math.random() * 12) + 7;
         const discount = Math.floor(vehicle.purchasePrice * (priceDropPercent / 100));
         vehicle.purchasePrice -= discount;
-        
         alert(`🤝 Succès ! Le vendeur accepte de baisser son prix de ${priceDropPercent}% (-${discount} €) !`);
     } else {
-        // Échec de la négociation : le vendeur retire son véhicule du marché
         alert("😤 Le vendeur a pris la mouche face à votre offre et s'en va avec son véhicule !");
-        marketVehicles = marketVehicles.filter(v => v.id !== vehicleId);
+        window.marketVehicles = window.marketVehicles.filter(v => v.id !== vehicleId);
     }
 
-    if (typeof updateGlobalUI === "function") updateGlobalUI();
+    if (typeof window.saveDataToFirebase === "function") window.saveDataToFirebase();
+    if (typeof window.updateGlobalUI === "function") window.updateGlobalUI();
 }
 
 /**
- * Achète un véhicule sur le marché pour le mettre dans le garage du joueur
+ * Achète un véhicule sur le marché
  */
 function buyVehicleFromMarket(vehicleId) {
-    const index = marketVehicles.findIndex(v => v.id === vehicleId);
+    const index = window.marketVehicles.findIndex(v => v.id === vehicleId);
     if (index === -1) return;
     
-    const vehicle = marketVehicles[index];
+    const vehicle = window.marketVehicles[index];
 
-    // Vérification des règles de gestion (Garage plein ou manque de fonds)
-    if (player.garage.length >= player.garageSlots) {
+    if (window.player.garage.length >= window.player.garageSlots) {
         alert("Votre garage est plein ! Vendez un véhicule ou achetez une extension au Bureau.");
         return;
     }
 
-    if (player.cash < vehicle.purchasePrice) {
+    if (window.player.cash < vehicle.purchasePrice) {
         alert("Fonds insuffisants pour acquérir ce véhicule !");
         return;
     }
 
-    // Processus de transaction
-    player.cash -= vehicle.purchasePrice;
-    player.garage.push(vehicle); // Ajout au garage
-    marketVehicles.splice(index, 1); // Retrait du marché
+    window.player.cash -= vehicle.purchasePrice;
+    window.player.garage.push(vehicle);
+    window.marketVehicles.splice(index, 1);
 
-    if (typeof updateGlobalUI === "function") updateGlobalUI();
+    if (typeof window.saveDataToFirebase === "function") window.saveDataToFirebase();
+    if (typeof window.updateGlobalUI === "function") window.updateGlobalUI();
 }
 
 /* ==========================================================================
@@ -105,18 +91,17 @@ function buyVehicleFromMarket(vehicleId) {
 
 function updateMarketUI() {
     const container = document.getElementById('market-container');
-    if (!container) return;
+    if (!container || !window.marketVehicles || !window.player) return;
 
     container.innerHTML = '';
 
-    if (marketVehicles.length === 0) {
+    if (window.marketVehicles.length === 0) {
         container.innerHTML = '<div class="empty-message">Plus d\'offres aujourd\'hui. Passez à la journée suivante !</div>';
         return;
     }
 
-    marketVehicles.forEach(vehicle => {
-        // Bouton acheter désactivé si le joueur n'a pas les moyens ou si le garage est plein
-        const canBuy = (player.cash >= vehicle.purchasePrice) && (player.garage.length < player.garageSlots);
+    window.marketVehicles.forEach(vehicle => {
+        const canBuy = (window.player.cash >= vehicle.purchasePrice) && (window.player.garage.length < window.player.garageSlots);
         
         const card = document.createElement('div');
         card.className = 'vehicle-card';
@@ -141,3 +126,7 @@ function updateMarketUI() {
         container.appendChild(card);
     });
 }
+
+// Globalisation des fonctions du marché
+window.refreshMarket = refreshMarket;
+window.updateMarketUI = updateMarketUI;
