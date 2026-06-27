@@ -2,7 +2,8 @@
    GAME ENGINE - MAIN COLLABORATOR WITH SAVE SYSTEM
    ========================================================================== */
 
-let gameState = {
+// Initialisation des variables globales attachées à la fenêtre (window) pour casser l'isolement des modules
+window.gameState = {
     currentDay: 1,
     stats: {
         totalSold: 0,
@@ -44,7 +45,7 @@ function setupEventListeners() {
  * Cycle temporel du jeu avec auto-save cloud
  */
 function nextDay() {
-    gameState.currentDay++;
+    window.gameState.currentDay++;
     if (typeof refreshMarket === "function") refreshMarket();
     updateGlobalUI();
     
@@ -58,13 +59,19 @@ function nextDay() {
  * Mise à jour globale de l'interface
  */
 function updateGlobalUI() {
-    document.getElementById('calendar').innerText = `Jour ${gameState.currentDay}`;
+    // Protection si les variables ne sont pas encore chargées depuis Firebase
+    if (!window.player || !window.gameState) return;
+
+    document.getElementById('calendar').innerText = `Jour ${window.gameState.currentDay}`;
     if (typeof updatePlayerUI === "function") updatePlayerUI();
     if (typeof updateMarketUI === "function") updateMarketUI();
     if (typeof updateGarageUI === "function") updateGarageUI();
     
-    document.getElementById('stat-total-sold').innerText = gameState.stats.totalSold;
-    document.getElementById('stat-total-profit').innerText = `${gameState.stats.totalProfit.toLocaleString()} €`;
+    document.getElementById('stat-total-sold').innerText = window.gameState.stats.totalSold;
+    document.getElementById('stat-total-profit').innerText = `${window.gameState.stats.totalProfit.toLocaleString()} €`;
 }
+
+// Rend la fonction accessible aux autres scripts
+window.updateGlobalUI = updateGlobalUI;
 
 window.onload = initGame;
